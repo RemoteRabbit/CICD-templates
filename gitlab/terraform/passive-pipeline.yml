@@ -1,0 +1,73 @@
+default:
+  image:
+    name: hashicorp/terraform:light
+    entrypoint:
+    - /usr/bin/env
+    - PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+
+###############
+## Variables ##
+###############
+variables:
+  TF_PLAN_FILE: "${CI_COMMIT_SHA}-${env}.tfplan"
+
+#############
+## Anchors ##
+#############
+.core:
+  only:
+    - merge_requests
+    - tags
+  except:
+    - main
+  resource_group: ${env}
+  environment: ${env}
+  parallel:
+    matrix:
+      - env: [dev, test, prod]
+
+########## 
+## Jobs ##
+##########
+.tflint:
+  extends:
+    - .core
+  script:
+    - echo "tflint is not currently available for ${env}"
+  when: always
+
+.validate:
+  extends:
+    - .core
+  script:
+    - terraform fmt -check=true -diff=true -recursive
+    - terraform validate
+  when: always
+
+.plan:
+  extends:
+    - .core
+  script:
+    - terraform plan -var-file="vars/${env}.tfvars" -input=false -out=${TF_PLAN_FILE}
+  artifacts:
+    paths:
+      - ${TF_PLAN_FILE}
+    expire_in: 8 weeks
+
+.apply:
+  only:
+    - tags
+  extends:
+    - .core
+  script:
+    - terraform apply -input=false ${TF_PLAN_FILE}
+  when: manual
+
+.destroy:
+  only:
+    - tags
+  extends:
+    - .core
+  script:
+    - terraform destroy -var-file="vars/${env}.tfvars" -auto-approve
+  when: manual
