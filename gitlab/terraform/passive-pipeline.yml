@@ -37,8 +37,6 @@ variables:
   when: always
 
 .validate:
-  needs:
-    - tflint
   extends:
     - .core
   script:
